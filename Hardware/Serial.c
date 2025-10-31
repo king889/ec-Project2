@@ -2,8 +2,8 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-uint8_t Serial_RxData;
-uint8_t Serial_RxFlag;
+char Serial_RxPacket[100];				//"@MSG\r\n"
+uint8_t Serial_RxFlag=0;
 
 void Serial_Init(void)
 {
@@ -103,27 +103,45 @@ void Serial_Printf(char *format, ...)
 	Serial_SendString(String);
 }
 
-uint8_t Serial_GetRxFlag(void)
-{
-	if (Serial_RxFlag == 1)
-	{
-		Serial_RxFlag = 0;
-		return 1;
-	}
-	return 0;
-}
-
-uint8_t Serial_GetRxData(void)
-{
-	return Serial_RxData;
-}
-
 void USART1_IRQHandler(void)
 {
+	static uint8_t RxState = 0;
+	static uint8_t pRxPacket = 0;
 	if (USART_GetITStatus(USART1, USART_IT_RXNE) == SET)
 	{
-		Serial_RxData = USART_ReceiveData(USART1);
-		Serial_RxFlag = 1;
+		uint8_t RxData = USART_ReceiveData(USART1);
+		
+		if (RxState == 0)
+		{
+			if (RxData == '@' && Serial_RxFlag == 0)
+			{
+				RxState = 1;
+				pRxPacket = 0;
+			}
+		}
+		else if (RxState == 1)
+		{
+			if (RxData == '\r')
+			{
+				RxState = 2;
+			}
+			else
+			{
+				Serial_RxPacket[pRxPacket] = RxData;
+				pRxPacket ++;
+			}
+		}
+		else if (RxState == 2)
+		{
+			if (RxData == '\n')
+			{
+				RxState = 0;
+				Serial_RxPacket[pRxPacket] = '\0';
+				Serial_RxFlag = 1;
+
+			}
+		}
+		
 		USART_ClearITPendingBit(USART1, USART_IT_RXNE);
 	}
 }

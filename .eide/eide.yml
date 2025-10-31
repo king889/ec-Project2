@@ -100,6 +100,8 @@ virtualFolder:
         - path: User/stm32f10x_conf.h
         - path: User/stm32f10x_it.c
         - path: User/stm32f10x_it.h
+        - path: User/PID.h
+        - path: User/PID.c
       folders: []
 dependenceList: []
 outDir: build

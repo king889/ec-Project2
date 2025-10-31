@@ -8,217 +8,176 @@
 #include "Motor.h"
 #include "Encoder.h"
 #include "Serial.h"
+#include "PID.h"
+#include <stdio.h>
+#include "string.h"
+#include "stdlib.h"
 
-/*OLED测试*/
-//int main(void)
-//{
-//	OLED_Init();
-//	
-//	OLED_ShowString(0, 0, "Hello,世界。", OLED_8X16);
-//	OLED_ShowFloatNum(0, 16, 12.345, 2, 3, OLED_8X16);
-//	OLED_Printf(0, 32, OLED_8X16, "Num=%d", 666);
-//	
-//	OLED_Update();
-//	
-//	while (1)
-//	{
-//		
-//	}
-//}
-
-
-/*LED测试*/
-//int main(void)
-//{
-//	LED_Init();
-//	
-//	while (1)
-//	{
-//		LED_ON();
-//		Delay_ms(500);
-//		LED_OFF();
-//		Delay_ms(500);
-//		LED_Turn();
-//		Delay_ms(500);
-//		LED_Turn();
-//		Delay_ms(500);
-//	}
-//}
-
-
-/*定时中断和非阻塞式按键测试*/
-//uint16_t i;
-//uint16_t j;
-//uint8_t KeyNum;
-
-//int main(void)
-//{
-//	OLED_Init();
-//	Key_Init();
-//	
-//	Timer_Init();
-//	
-//	while (1)
-//	{
-//		KeyNum = Key_GetNum();
-//		if (KeyNum == 1)
-//		{
-//			j ++;
-//		}
-//		if (KeyNum == 2)
-//		{
-//			j --;
-//		}
-//		if (KeyNum == 3)
-//		{
-//			j += 10;
-//		}
-//		if (KeyNum == 4)
-//		{
-//			j -= 10;
-//		}
-//		
-//		OLED_Printf(0, 0, OLED_8X16, "i:%05d", i);
-//		OLED_Printf(0, 16, OLED_8X16, "j:%05d", j);
-//		
-//		OLED_Update();
-//	}
-//}
-
-//void TIM1_UP_IRQHandler(void)
-//{
-//	if (TIM_GetITStatus(TIM1, TIM_IT_Update) == SET)
-//	{
-//		i ++;
-//		
-//		Key_Tick();
-//		
-//		TIM_ClearITPendingBit(TIM1, TIM_IT_Update);
-//	}
-//}
-
-/*电位器旋钮测试*/
-//int main(void)
-//{
-//	OLED_Init();
-//	RP_Init();
-//	
-//	while (1)
-//	{
-//		OLED_Printf(0, 0, OLED_8X16, "RP1:%04d", RP_GetValue(1));
-//		OLED_Printf(0, 16, OLED_8X16, "RP2:%04d", RP_GetValue(2));
-//		OLED_Printf(0, 32, OLED_8X16, "RP3:%04d", RP_GetValue(3));
-//		OLED_Printf(0, 48, OLED_8X16, "RP4:%04d", RP_GetValue(4));
-//		
-//		OLED_Update();
-//	}
-//}
-
-/*电机测试*/
-//uint8_t KeyNum;
-//int16_t PWM;
-
-//int main(void)
-//{
-//	OLED_Init();
-//	Key_Init();
-//	Motor_Init();
-//	
-//	Timer_Init();
-//	
-//	while (1)
-//	{
-//		KeyNum = Key_GetNum();
-//		if (KeyNum == 1)
-//		{
-//			PWM += 10;
-//			if (PWM > 100) {PWM = 100;}
-//		}
-//		if (KeyNum == 2)
-//		{
-//			PWM -= 10;
-//			if (PWM < -100) {PWM = -100;}
-//		}
-//		if (KeyNum == 3)
-//		{
-//			PWM = 0;
-//		}
-//		
-//		Motor_SetPWM(PWM);
-//		
-//		OLED_Printf(0, 0, OLED_8X16, "PWM:%+04d", PWM);
-//		
-//		OLED_Update();
-//	}
-//}
-
-//void TIM1_UP_IRQHandler(void)
-//{
-//	if (TIM_GetITStatus(TIM1, TIM_IT_Update) == SET)
-//	{
-//		Key_Tick();
-//		
-//		TIM_ClearITPendingBit(TIM1, TIM_IT_Update);
-//	}
-//}
-
-
-/*编码器测试*/
-//int16_t Speed;
-//int16_t Location;
-
-//int main(void)
-//{
-//	OLED_Init();
-//	Encoder_Init();
-//	
-//	Timer_Init();
-//	
-//	while (1)
-//	{
-//		OLED_Printf(0, 0, OLED_8X16, "Speed:%+05d", Speed);
-//		OLED_Printf(0, 16, OLED_8X16, "Location:%+05d", Location);
-//		
-//		OLED_Update();
-//	}
-//}
-
-//void TIM1_UP_IRQHandler(void)
-//{
-//	static uint16_t Count;
-//	
-//	if (TIM_GetITStatus(TIM1, TIM_IT_Update) == SET)
-//	{
-//		Count ++;
-//		if (Count >= 40)
-//		{
-//			Count = 0;
-//			
-//			Speed = Encoder_Get();
-//			Location += Speed;
-//		}
-//		
-//		TIM_ClearITPendingBit(TIM1, TIM_IT_Update);
-//	}
-//}
-
-
-/*串口测试*/
-uint16_t RP1, RP2, RP3, RP4=0;
+uint16_t RP1, RP2, RP3, RP4 = 0;
 uint8_t RxData;
+uint8_t State=1;
+int16_t Speed1,Speed2;        // 改为有符号整型
+int32_t Location1,Location2;     // 改为有符号长整型
+uint8_t Keynum;
+
+// PID参数定义在外面
+PID_t Motor1_PID = {
+    .Target = 0,
+    .Actual = 0,
+    .Out = 0,
+    .Kp = 0.35,
+    .Ki = 0.02, 
+    .Kd = 0.4,
+    .Error0 = 0,
+    .Error1 = 0,
+    .Error2 = 0,
+    .OutMax = 100,
+    .DeadZone =0,
+    .OutMin = -100
+};
+
+PID_t Motor2_PID_Speed = {
+    .Target = 0,
+    .Actual = 0,
+    .Out = 0,
+    .Kp = 0.35,
+    .Ki = 0.02, 
+    .Kd = 0.4,
+    .Error0 = 0,
+    .Error1 = 0,
+    .Error2 = 0,
+    .DeadZone =0,
+    .OutMax = 100,
+    .OutMin = -100
+};
+
+PID_t Motor2_PID_Pos = {
+    .Target = 0,
+    .Actual = 0,
+    .Out = 0,
+    .Kp = 1,
+    .Ki = 0.08, 
+    .Kd = 1,
+    .Error0 = 0,
+    .Error1 = 0,
+    .DeadZone =5,
+    .Error2 = 0,
+    .OutMax = 74,
+    .OutMin = -74
+};
+
+
 
 int main(void)
 {
-	OLED_Init();
-	RP_Init();
-	Serial_Init();
-	
-	while (1)
-	{
-		if (Serial_GetRxFlag() == 1)
-		{
-			RxData = Serial_GetRxData();
-			Serial_SendByte(RxData);
-		}
-	}
+    OLED_Init();
+    RP_Init();
+    Serial_Init();
+
+    Encoder_Init();
+    Motor_Init();
+    Key_Init();
+
+    Timer_Init(); 
+
+    while (1)
+    {
+		Keynum=Key_GetNum();
+        if (Keynum==1)
+        {
+            State = (State % 2) + 1;
+            OLED_Clear();
+            OLED_Update();
+            Serial_Printf("OK");
+            Location1=0;Location2=0;
+            Motor_SetPWM1(0);
+
+        }        
+        if (State==1)
+        {
+            if (Serial_RxFlag == 1)
+            {
+                if (strncmp(Serial_RxPacket, "speed%", 6) == 0)
+                {
+                    Motor1_PID.Target = atoi(Serial_RxPacket + 6);
+                }
+                Serial_RxFlag = 0;
+            }		
+            OLED_Printf(0,0,OLED_8X16,"Speed_Control");
+            OLED_Printf(0, 16, OLED_8X16, "Sp1:%+06d", Speed1);
+            OLED_Printf(0, 32, OLED_8X16, "Tar:%+08ld", Motor1_PID.Target);
+            OLED_Update();
+        }                                
+        else if (State==2)
+        {
+            OLED_Clear();
+            OLED_Printf(0,0,OLED_8X16,"Pos_Control");
+            OLED_Printf(0, 16, OLED_8X16, "Pos1:%+06d", Location1);
+            OLED_Printf(0, 32, OLED_8X16, "Pos2:%+06d", Location2);
+            OLED_Update();
+
+
+        }
+        
+        
+        
+        Serial_Printf("%d,%f,%d,%f,%d,%d\r\n",Speed1,Motor1_PID.Target,Speed2,Motor2_PID_Speed.Target,Location1,Location2);
+    }
 }
+
+void TIM1_UP_IRQHandler(void)
+{
+    static uint16_t Count1,Count2;
+
+    if (TIM_GetITStatus(TIM1, TIM_IT_Update) == SET)
+    {
+        Key_Tick();
+        
+
+        
+        if(State==1)
+        {
+            Count1++;
+            if (Count1 >= 10)
+            {
+                Speed1 = Encoder_Get1();
+                Location1 += Speed1;
+                Speed2=Encoder_Get2();
+                Location2+=Speed2;
+                Count1 = 0;
+
+                
+                // PID控制
+                Motor1_PID.Actual = Speed1;        // 更新实际值
+                PID_Update(&Motor1_PID);           // 更新PID计算
+                Motor_SetPWM1(-(int8_t)Motor1_PID.Out); // 设置电机PWM
+            }
+        }
+        else if (State==2)
+        {
+            Count2++;
+            if (Count2 >= 10)
+            {
+                Count2 = 0;
+                Speed1 = Encoder_Get1();
+                Location1 += Speed1;
+                Speed2=Encoder_Get2();
+                Location2+=Speed2;
+                
+                Motor2_PID_Pos.Target = Location1;
+                Motor2_PID_Pos.Actual = Location2;
+                PID_Update(&Motor2_PID_Pos);
+
+                Motor2_PID_Speed.Target = Motor2_PID_Pos.Out;
+                Motor2_PID_Speed.Actual = Speed2;        // 更新实际值
+                PID_Update(&Motor2_PID_Speed);           // 更新PID计算
+                Motor_SetPWM2(Motor2_PID_Speed.Out); // 设置电机PWM
+            }
+        }           
+        }
+        
+        
+        TIM_ClearITPendingBit(TIM1, TIM_IT_Update);
+}
+
+
